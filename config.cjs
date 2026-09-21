@@ -1,0 +1,14 @@
+const path=require('node:path');
+const production=process.env.NODE_ENV==='production';
+const port=Number(process.env.PORT||8769);
+if(!Number.isInteger(port)||port<1||port>65535)throw Error('PORT inválido');
+const origin=process.env.PUBLIC_ORIGIN||'';
+if(production&&(!origin||new URL(origin).protocol!=='https:'||new URL(origin).origin!==origin))throw Error('PUBLIC_ORIGIN debe ser el dominio HTTPS sin barra final');
+const key=process.env.PASSWORD_ENCRYPTION_KEY||'';
+if(key&&(!/^[A-Za-z0-9+/]{43}=$/.test(key)||Buffer.from(key,'base64').length!==32))throw Error('PASSWORD_ENCRYPTION_KEY debe contener 32 bytes en base64');
+if(production&&!key)throw Error('Falta PASSWORD_ENCRYPTION_KEY');
+if(production&&!process.env.DATABASE_URL&&!(process.env.PGHOST&&process.env.PGUSER&&process.env.PGPASSWORD&&process.env.PGDATABASE))throw Error('Falta conexión PostgreSQL');
+const sslMode=process.env.DB_SSL_MODE||'disable';
+if(!['disable','verify-full'].includes(sslMode))throw Error('DB_SSL_MODE inválido');
+const postgres={...(process.env.DATABASE_URL?{connectionString:process.env.DATABASE_URL}:{host:process.env.PGHOST||'127.0.0.1',port:Number(process.env.PGPORT||18777),database:process.env.PGDATABASE||'macarena',user:process.env.PGUSER,password:process.env.PGPASSWORD}),ssl:sslMode==='verify-full'?{rejectUnauthorized:true,...(process.env.DB_SSL_CA?{ca:process.env.DB_SSL_CA}:{})}:false,connectionTimeoutMillis:5000,query_timeout:15000};
+module.exports={production,port,host:process.env.HOST||'0.0.0.0',origin,encryptionKey:key,dataDir:process.env.DATA_DIR||path.join(__dirname,'data'),postgres};

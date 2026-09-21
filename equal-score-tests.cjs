@@ -1,0 +1,8 @@
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),M=require('./model.cjs'),Sync=require('./sync.cjs'),{confirmed}=require('./confirmation.cjs'),{Engine}=require('./public/offline.js');
+async function main(){const s=M.seed();Sync.migrate(s);const u=s.players[0];s.cards.G3.scores=Array(18).fill(2);s.cards.G3.holeVersions=Array(18).fill(1);s.cards.G3.revision=18;
+const op={id:crypto.randomUUID(),type:'score',userId:u.id,groupId:'G3',generation:0,hole:8,score:2,baseScore:null,baseVersion:0};const before=JSON.stringify(s);
+assert(confirmed(s,u,op));assert(!confirmed(s,u,{...op,score:3}));assert(!confirmed(s,u,{...op,generation:1}));assert(!confirmed(s,u,{...op,baseVersion:2}));assert(!confirmed(s,u,{...op,type:'finalize'}));assert(!confirmed(s,u,{...op,userId:s.players[4].id}));
+const snapshot={...structuredClone(s),me:u.id,offlineUntil:Date.now()+60000,permissions:{G3:true}},store={r:{snapshot,pending:[{...op,status:409,problem:'Conflicto'}]},async read(){return structuredClone(this.r)},async change(id,fn){this.r=fn(this.r);return structuredClone(this.r)}};
+const engine=new Engine({store,waitForConfirmation:true,transport:async(route,data)=>{if(route==='state')return snapshot;if(route==='confirm')return {state:snapshot,confirmed:data.operations.filter(o=>confirmed(s,u,o)).map(o=>o.id)};throw Error('No debe escribir golpes');}});
+await engine.restore(u.id);await engine.sync();assert.equal(engine.record.pending.length,0);assert.equal(JSON.stringify(s),before);assert.equal(engine.record.snapshot.cards.G3.finalized,null);console.log('OK Grupo 3: 2 coincide con 2; se libera pendiente sin escrituras. Se conservan conflictos reales y firmas.');}
+main().catch(e=>{console.error(e);process.exitCode=1});

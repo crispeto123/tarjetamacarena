@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),M=require('./model.cjs');
+const s=M.seed();M.validate(s);assert.equal(s.players.length,16);assert.equal(s.course.pars.reduce((a,b)=>a+b),72);
+assert.deepEqual(M.order(10),[9,10,11,12,13,14,15,16,17,0,1,2,3,4,5,6,7,8]);
+const captain=s.players[4],reader=s.players[1],admin=s.players[0];
+assert.equal(M.canEdit(s,captain,'G1'),false);s.editing=true;assert.equal(M.canEdit(s,captain,'G1'),true);assert.equal(M.canEdit(s,captain,'G2'),false);assert.equal(M.canEdit(s,captain,'G3'),false);assert.equal(M.canEdit(s,reader,'G1'),false);
+s.editing=false;assert.equal(M.canEdit(s,admin,'G3'),true);s.cards.G3.finalized={};assert.equal(M.canEdit(s,admin,'G3'),false);
+s.cards.G1.scores[9]=3;assert.deepEqual(M.total(s,s.cards.G1),{strokes:3,par:4,played:1,relative:-1});s.cards.G1.scores[10]=5;assert.equal(M.total(s,s.cards.G1).relative,1);s.cards.G1.scores[9]=null;assert.equal(M.total(s,s.cards.G1).relative,2);
+const invalid=structuredClone(s);invalid.members[1].start=10;assert.throws(()=>M.validate(invalid),/compartir salida/);
+const invalid2=structuredClone(s);invalid2.assignments[0].playerId=s.players[8].id;assert.throws(()=>M.validate(invalid2),/misma salida/);
+assert(M.passwordMatches('1130',admin.passwordHash));assert(!M.passwordMatches('wrong',admin.passwordHash));
+console.log('OK: cálculo, 18 hoyos, capitanes, lectura, administrador, cierre, contraseñas y asignaciones.');

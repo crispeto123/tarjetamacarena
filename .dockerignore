@@ -1,0 +1,6 @@
+data
+backups
+test-signature.jpg
+test-*
+node_modules
+upgrade-*
