@@ -224,7 +224,8 @@ function showHolePopup(el){
  const id=el.dataset.group,hole=Number(el.dataset.hole);
  if(!el.isConnected||busy||$('#modal').open||hasPending(id)||!S.permissions[id]||!validHoleText(el.value)||el.value===String(S.cards[id].scores[hole]??''))return;
  holePopupActive=true;
- modal(`<h2>${el.value?esc(el.value)+' Golpes Hoyo '+(hole+1):'Borrar golpes en Hoyo '+(hole+1)}</h2><div class="form-actions">${button('Guardar','id="confirm-save-hole" autofocus','primary')}</div>`);
+ const captain=groupCaptain(id);
+ modal(`<h2>Hoyo ${hole+1} · ${el.value?'Golpes '+esc(el.value):'Borrar golpes'}</h2><p>${captain?'(Le anotas a &quot;'+esc(name(captain.id))+'&quot;)':'(Equipo sin capitán asignado)'}</p><div class="form-actions">${button('Guardar','id="confirm-save-hole" autofocus','primary')}</div>`);
  const dialog=$('#modal');let saving=false;dialog.addEventListener('close',()=>{holePopupActive=false;if(!saving&&el.isConnected){el.focus();updateCardFeedback(el.closest('.card'));}},{once:true});
 
  $('#confirm-save-hole').onclick=async()=>{saving=true;dialog.close();holePopupActive=false;scoreCommit=scoreCommit.then(()=>commitScore(el));if(await scoreCommit){const next=MacarenaScoring.nextHole(S.cards[id].scores,start(id));el.closest('.card')?.querySelector(`[data-hole="${next}"]`)?.focus();}};
