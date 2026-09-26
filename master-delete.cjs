@@ -1,10 +1,19 @@
 const crypto=require('crypto');
 const keys={players:'id',groups:'id',members:'playerId',assignments:'groupId'},labels={players:'Jugadores',groups:'Grupos',members:'Grupo–Jugador',assignments:'Asignación de tarjetas'};
-function inspect(s,user,type,id){if(!user.admin)throw Object.assign(Error('Solo administradores'),{status:403});const key=keys[type];if(!key)throw Error('Maestro no válido');const r=s[type].find(r=>r[key]===id);if(!r)throw Object.assign(Error('Registro no encontrado'),{status:404});const used=new Set(),busy=g=>s.cards[g]&&(s.cards[g].finalized||s.cards[g].scores.some(v=>v!==null));
+function inspectRoster(s,id){
+ const group=s.groups.find(g=>g.id===id),members=s.members.filter(m=>m.groupId===id);
+ if(!group||!members.length)throw Object.assign(Error('El grupo no tiene integrantes para eliminar'),{status:404});
+ const used=[];
+ if(group.rosterClosed)used.push('Grupo–Jugador (grupo cerrado; ábralo primero)');
+ if(s.cards[id]&&(s.cards[id].finalized||s.cards[id].scores.some(v=>v!==null)))used.push('Tarjetas');
+ if(s.assignments.some(a=>a.groupId===id||members.some(m=>m.playerId===a.playerId)))used.push('Asignación de tarjetas');
+ return {allowed:!used.length,message:used.length?'No se puede eliminar porque está siendo utilizado en: '+used.join(', ')+'.':'',label:group.name+' · '+members.length+' integrantes',version:crypto.createHash('sha256').update(JSON.stringify({group,members})).digest('hex'),tables:used};
+}
+function inspect(s,user,type,id){if(!user.admin)throw Object.assign(Error('Solo administradores'),{status:403});if(type==='rosters')return inspectRoster(s,id);const key=keys[type];if(!key)throw Error('Maestro no válido');const r=s[type].find(r=>r[key]===id);if(!r)throw Object.assign(Error('Registro no encontrado'),{status:404});const used=new Set(),busy=g=>s.cards[g]&&(s.cards[g].finalized||s.cards[g].scores.some(v=>v!==null));
 if(type==='players'){if(id===user.id)used.add('Usuarios (sesión del administrador)');if(s.members.some(m=>m.playerId===id))used.add('Grupo–Jugador');if(s.assignments.some(a=>a.playerId===id))used.add('Asignación de tarjetas');if(Object.values(s.cards).some(c=>c.finalized&&[c.finalized.by,c.finalized.captain,c.finalized.writer].includes(id)))used.add('Tarjetas finalizadas');if(s.audit.some(a=>a.user===id))used.add('Historial');if(r.active&&r.admin&&s.players.filter(p=>p.active&&p.admin).length===1)used.add('Administradores activos');}
 if(type==='groups'){if(s.members.some(m=>m.groupId===id))used.add('Grupo–Jugador');if(s.assignments.some(a=>a.groupId===id))used.add('Asignación de tarjetas');if(busy(id))used.add('Tarjetas');}
 if(type==='members'){if(s.groups.find(g=>g.id===r.groupId)?.rosterClosed)used.add('Grupo–Jugador (grupo cerrado; ábralo primero)');if(busy(r.groupId))used.add('Tarjetas');if(s.assignments.some(a=>a.playerId===id||a.groupId===r.groupId&&s.members.filter(m=>m.groupId===r.groupId).length===1))used.add('Asignación de tarjetas');}
 if(type==='assignments'&&busy(r.groupId))used.add('Tarjetas');
 const tables=[...used];return {allowed:!tables.length,message:tables.length?'No se puede eliminar porque está siendo utilizado en: '+tables.join(', ')+'.':'',label:type==='players'?r.name+' '+r.surname:type==='groups'?r.name:type==='members'?r.groupId+' / '+id:r.groupId,version:crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex'),tables};}
-function remove(s,user,type,id,version){const check=inspect(s,user,type,id);if(!check.allowed)throw Object.assign(Error(check.message),{status:409});if(check.version!==version)throw Object.assign(Error('El registro cambió. Revise y confirme nuevamente.'),{status:409});s[type]=s[type].filter(r=>r[keys[type]]!==id);if(type==='groups')delete s.cards[id];}
+function remove(s,user,type,id,version){const check=inspect(s,user,type,id);if(!check.allowed)throw Object.assign(Error(check.message),{status:409});if(check.version!==version)throw Object.assign(Error('El registro cambió. Revise y confirme nuevamente.'),{status:409});if(type==='rosters'){s.members=s.members.filter(m=>m.groupId!==id);return;}s[type]=s[type].filter(r=>r[keys[type]]!==id);if(type==='groups')delete s.cards[id];}
 module.exports={inspect,remove};
