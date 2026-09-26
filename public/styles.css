@@ -164,3 +164,5 @@ header{gap:28px}.brand{flex-shrink:0}.account{min-width:0;margin-left:auto}.acco
 .history-controls{flex-wrap:wrap}.history-pages{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;margin:8px 0}[hidden]{display:none!important}
 
 .card-save-state{font-size:12px;margin:6px 20px;color:var(--green)}.card-save-state.attention{color:#8b4c00}.hole.hole-unsaved{outline:2px dashed #a66b00;outline-offset:-2px}.hole.hole-saving{outline:2px solid #a66b00;outline-offset:-2px}button.eye,.master-panel button.danger:has(svg){min-width:40px;min-height:40px}
+
+.cards-filter-status{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:14px}.cards-filter-status[hidden]{display:none}.cards-filter-status button{min-height:40px}
