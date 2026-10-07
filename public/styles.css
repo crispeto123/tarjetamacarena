@@ -168,3 +168,5 @@ header{gap:28px}.brand{flex-shrink:0}.account{min-width:0;margin-left:auto}.acco
 .cards-filter-status{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:14px}.cards-filter-status[hidden]{display:none}.cards-filter-status button{min-height:40px}
 
 .import-errors{max-height:320px;overflow:auto}.import-errors td:last-child{white-space:normal;min-width:220px}.import-errors table{font-size:12px}
+
+.own-card-button{margin-bottom:12px}.own-card-preview{max-width:560px}.own-card-preview h2{font-size:24px}.preview-summary{display:flex;justify-content:space-between;gap:10px;font-size:14px;margin:12px 0}.preview-holes{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}.preview-hole{text-align:center;border-radius:4px;padding:6px 0}.preview-hole span,.preview-hole small,.preview-hole strong{display:block}.preview-hole span{font-size:11px}.preview-hole small{font-size:9px}.preview-hole strong{font-size:17px}.preview-subtotal{display:flex;justify-content:flex-end;gap:10px;font-size:12px;margin:6px 0 14px}
