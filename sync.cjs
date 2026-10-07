@@ -1,5 +1,5 @@
 const crypto=require('node:crypto'),M=require('./model.cjs'),Scoring=require('./public/scoring.js');
-function migrate(s){s.receipts??={};s.rainFinalization??=false;for(const c of Object.values(s.cards)){c.holeVersions??=Array(18).fill(0);c.generation??=0;}}
+function migrate(s){s.receipts??={};s.rainFinalization??=false;s.nonCaptainEditing??=false;for(const c of Object.values(s.cards)){c.holeVersions??=Array(18).fill(0);c.generation??=0;}}
 function fail(message,status){const e=Error(message);e.status=status;throw e;}
 function apply(s,user,op){
  migrate(s);

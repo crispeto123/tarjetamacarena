@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),M=require('./model.cjs'),Sync=require('./sync.cjs');
+const s=M.seed();M.validate(s);Sync.migrate(s);s.editing=true;
+const assignment=s.assignments[0],target=assignment.groupId,cm=s.members.find(m=>m.playerId===assignment.playerId),member=s.members.find(m=>m.groupId===cm.groupId&&!m.captain),u=s.players.find(p=>p.id===member.playerId);u.admin=false;
+assert.equal(s.nonCaptainEditing,false);assert.equal(M.canEdit(s,u,target),false);
+s.nonCaptainEditing=true;assert.equal(M.canEdit(s,u,target),true);assert.equal(M.canEdit(s,u,cm.groupId),false);
+for(const g of s.groups.filter(g=>g.id!==target))assert.equal(M.canEdit(s,u,g.id),false);
+const c=s.cards[target],hole=M.startOf(s,target)-1,op={id:'delegated-score-001',type:'score',userId:u.id,groupId:target,generation:c.generation,hole,score:4,baseScore:null,baseVersion:0};
+Sync.apply(s,u,op);assert.equal(c.scores[hole],4);
+assert.throws(()=>Sync.apply(s,u,{...op,id:'delegated-score-002'}),e=>e.status===409);
+s.nonCaptainEditing=false;assert.throws(()=>Sync.apply(s,u,{...op,id:'delegated-score-003'}),e=>e.status===403);s.nonCaptainEditing=true;
+s.editing=false;assert.equal(M.canEdit(s,u,target),false);s.editing=true;
+u.active=false;assert.equal(M.canEdit(s,u,target),false);u.active=true;
+const captain=s.players.find(p=>p.id===cm.playerId);captain.active=false;assert.equal(M.canEdit(s,u,target),false);captain.active=true;
+c.finalized={};assert.equal(M.canEdit(s,u,target),false);c.finalized=null;
+c.scores=Array(18).fill(4);Sync.apply(s,u,{id:'delegated-finalize-001',type:'finalize',userId:u.id,groupId:target,generation:c.generation,scores:[...c.scores],holeVersions:[...c.holeVersions],captain:s.members.find(m=>m.groupId===target&&m.captain).playerId,writer:captain.id,signatures:Array(2).fill('data:image/jpeg;base64,'+'A'.repeat(1600))});
+assert.equal(c.finalized.by,u.id);assert.equal(c.finalized.writer,captain.id);
+console.log('OK: delegación, aislamiento por grupo, revocación, concurrencia, edición global, inactivos y firmas.');

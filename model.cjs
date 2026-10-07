@@ -12,7 +12,15 @@ function seed() {
 function startOf(s,g) { return s.members.find(m=>m.groupId===g)?.start; }
 function order(start) { return Array.from({length:18},(_,i)=>(start-1+i)%18); }
 function total(s,card) { let strokes=0,par=0,played=0; card.scores.forEach((v,i)=>{if(v!==null){strokes+=v;par+=s.course.pars[i];played++;}});return {strokes,par,played,relative:strokes-par}; }
-function canEdit(s,u,g) { if(!u?.active||!s.groups.find(x=>x.id===g)?.active||s.cards[g]?.finalized)return false;if(u.admin)return true;return s.editing&&s.members.some(m=>m.playerId===u.id&&m.captain)&&s.assignments.some(a=>a.groupId===g&&a.playerId===u.id)&&s.members.some(m=>m.playerId===u.id&&m.start===startOf(s,g)); }
+function canEdit(s,u,g) {
+ if(!u?.active||!s.groups.find(x=>x.id===g)?.active||s.cards[g]?.finalized)return false;
+ if(u.admin)return true;if(!s.editing)return false;
+ const own=s.members.find(m=>m.playerId===u.id),assignment=s.assignments.find(a=>a.groupId===g);
+ if(!own||!assignment||own.start!==startOf(s,g))return false;
+ if(own.captain&&assignment.playerId===u.id)return true;
+ if(!s.nonCaptainEditing||!s.groups.some(x=>x.id===own.groupId&&x.active)||own.groupId===g)return false;
+ return s.members.some(m=>m.groupId===own.groupId&&m.captain&&m.playerId===assignment.playerId&&m.start===own.start&&s.players.some(p=>p.id===m.playerId&&p.active));
+}
 function migrateCaptains(s){if(s.captainsExplicit)return;for(const g of s.groups){const captain=s.members.find(m=>m.groupId===g.id&&s.players.some(p=>p.id===m.playerId&&p.active&&p.category==='1ra'));for(const m of s.members.filter(m=>m.groupId===g.id))m.captain=m===captain;}s.captainsExplicit=true;}
 function validate(s) { migrateCaptains(s);
  const fail=m=>{throw Error(m)}; const unique=(list,label)=>{if(new Set(list).size!==list.length)fail(label+' duplicado');};
