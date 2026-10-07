@@ -11,6 +11,7 @@ let committed=structuredClone(state);
 async function persist(){await PG.save(state,committed);committed=structuredClone(state);}
 
 const SESSION_FILE=path.join(DATA,'sessions.json'),SESSION_MS=7*24*3600000;
+const importSecret=crypto.randomBytes(32);
 const sessions=new Map(PG.sessions),attempts=new Map(),streams=new Set();
 const tokenKey=token=>crypto.createHash('sha256').update(token||'').digest('hex');
 async function saveSessions(){for(const [key,value] of sessions)if(value.expires<Date.now())sessions.delete(key);await PG.saveSessions([...sessions]);}
@@ -43,7 +44,17 @@ const server=http.createServer(async(req,res)=>{const previous=requestTail;let r
  if(url.pathname==='/api/reset-tournament-check'&&req.method==='GET'){admin(user);return json({version:require('./reset-tournament.cjs').version(state)});}
  if(url.pathname==='/api/state'&&req.method==='GET'){const full=publicState(user);return json(req.headers['x-macarena-state']?(require('./state-wire.cjs')(full,req.headers['x-macarena-state'])||full):full);}
  if((url.pathname==='/api/card.pdf'||url.pathname==='/api/card-image')&&req.method==='GET'){const id=url.searchParams.get('group');if(!state.cards[id])error('Tarjeta no encontrada',404);if(!state.cards[id].finalized||state.cards[id].finalized.pending)error('Finalice la tarjeta antes de descargarla',403);const format=url.pathname==='/api/card-image'?'PNG':'PDF',output=require('./pdf.cjs')(state,id,format==='PNG'?'image':'pdf');await record(user,'download',{groupId:id,format});if(format==='PNG')return json(output);res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="Macarena-${id}.pdf"`);return res.end(output);}
+ if(url.pathname==='/api/import-template'&&req.method==='GET'){admin(user);res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');res.setHeader('Content-Disposition','attachment; filename="Plantilla_Carga_Jugadores_Grupos.xlsx"');return res.end(fs.readFileSync(path.join(ROOT,'templates','carga.xlsx')));}
  if(req.method!=='POST')error('Ruta no disponible',404);const b=await body(req);
+ if(['/api/import-excel-check','/api/import-excel'].includes(url.pathname)){
+  admin(user);const Import=require('./excel-import.cjs');
+  const {rows,digest}=await Import.readFile(b.file);const {records,summary}=Import.validate(state,rows);
+  const version=configVersion(),token=crypto.createHmac('sha256',importSecret).update(JSON.stringify([user.id,digest,version])).digest('hex');
+  if(url.pathname==='/api/import-excel-check')return json({summary,token,configVersion:version});
+  if(b.confirm!==true||b.token!==token)error('El archivo o la configuración cambió. Valide nuevamente antes de confirmar.',409);
+  const next=await Import.prepare(state,records,Vault);state=next;
+  await record(user,'excel-import',summary);return json(publicState(user));
+ }
  if(['/api/master','/api/roster','/api/editing','/api/rain-finalization','/api/reopen','/api/master-delete'].includes(url.pathname)&&b.baseConfigVersion&&b.baseConfigVersion!==configVersion())error('La configuración cambió en otro dispositivo. Revise los datos antes de guardar.',409);
  if(url.pathname==='/api/confirm'){if(!Array.isArray(b.operations)||b.operations.length>5)error('Consulta inválida');const confirmed=b.operations.filter(op=>require('./confirmation.cjs').confirmed(committed,user,op)).map(op=>op.id);return json({confirmed,state:publicState(user)});}
  if(url.pathname==='/api/sync'){const result=Sync.apply(state,user,b);if(!result.duplicate)await record(user,b.type,{groupId:b.groupId,hole:b.hole===undefined?undefined:b.hole+1,score:b.score,operationId:b.id,recordedAt:b.createdAt,administrative:b.type==='finalize'?state.cards[b.groupId].finalized.administrative:undefined});}
@@ -78,7 +89,7 @@ const server=http.createServer(async(req,res)=>{const previous=requestTail;let r
  }
  if(url.pathname==='/tournament-logo.jpg'){res.setHeader('Content-Type','image/jpeg');return res.end(T.logo(state).bytes);}
  const files={'/':'index.html','/app.js':'app.js','/scoring.js':'scoring.js','/offline.js':'offline.js','/styles.css':'styles.css','/sw.js':'sw.js','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg','/tournament-logo.jpg':'tournament-logo.jpg'};if(!files[url.pathname])error('No encontrado',404);res.setHeader('Content-Type',url.pathname.endsWith('.js')?'text/javascript; charset=utf-8':url.pathname.endsWith('.css')?'text/css; charset=utf-8':url.pathname.endsWith('.webmanifest')?'application/manifest+json':url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.jpg')?'image/jpeg':'text/html; charset=utf-8');res.end(fs.readFileSync(path.join(ROOT,'public',files[url.pathname])));
- }catch(e){res.writeHead(e.status||400,{'Content-Type':'application/json; charset=utf-8'});if(e.status===503)console.error('Guardado no confirmado:',e.cause?.code||'storage');res.end(JSON.stringify({error:e.code?'No pudimos completar la operación. Intente nuevamente.':e.message,...(e.status===401?{tournamentGeneration:state.tournamentGeneration||0}:{})}));}finally{release();}});
+ }catch(e){res.writeHead(e.status||400,{'Content-Type':'application/json; charset=utf-8'});if(e.status===503)console.error('Guardado no confirmado:',e.cause?.code||'storage');res.end(JSON.stringify({error:e.code?'No pudimos completar la operación. Intente nuevamente.':e.message,...(e.importErrors?{importErrors:e.importErrors}:{}),...(e.status===401?{tournamentGeneration:state.tournamentGeneration||0}:{})}));}finally{release();}});
 server.listen(Settings.port,Settings.host,()=>console.log(`Tarjeta Macarena: http://127.0.0.1:${process.env.PORT||8769}`));
 
 
