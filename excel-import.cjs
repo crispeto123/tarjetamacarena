@@ -53,7 +53,12 @@ async function readFile(base64){
 function validate(state,rows){
  const errors=[],records=[],ids=new Map(),groups=new Map();
  const add=(r,c,m)=>errors.push(issue(r,c,m));
- for(const {row,values:v}of rows){
+ for(const {row,values}of rows){
+  const v=[...values];
+  for(const i of [0,6])if(typeof v[i]==='number'){
+   if(Number.isSafeInteger(v[i])&&v[i]>=0&&v[i]<=999999999999999)v[i]=String(v[i]);
+   else add(row,HEADERS[i],'Use un entero no negativo de hasta 15 dígitos, o escriba el identificador como texto. No se permiten decimales ni números cuya precisión pueda haberse perdido en Excel.');
+  }
   const [id,name,surname,category,password,active,groupId,start,captain]=v;
   for(let i=0;i<v.length;i++)if(i!==7&&(typeof v[i]!=='string'||!v[i].length||v[i].includes('\0')))add(row,HEADERS[i],'Campo obligatorio de tipo texto; no se permiten fórmulas, fechas ni otros tipos.');
   if(typeof id==='string'){

@@ -12,13 +12,20 @@ async function main(){
  const state=fixture(),original=structuredClone(state),good=await file(),parsed=await I.readFile(good),validated=I.validate(state,parsed.rows);
  assert.deepEqual(validated.summary,{players:2,members:2,groups:1});assert.deepEqual(state,original);
  const cases=[
-  [r=>r[1][0]=r[0][0],'Cedula'],[r=>r[0][0]=state.players[0].id,'Cedula'],[r=>r[0][0]=1234,'Cedula'],
+  [r=>r[1][0]=r[0][0],'Cedula'],[r=>r[0][0]=state.players[0].id,'Cedula'],[r=>r[0][0]=1234.5,'Cedula'],
   [r=>r[0][1]='x'.repeat(81),'Nombre'],[r=>r[0][4]='x'.repeat(65),'Clave'],[r=>r[0][3]='4ta','Categoria'],
   [r=>r[0][6]='MISSING','CodigoGrupo'],[r=>r[1][7]=10,'HoyoSalida'],[r=>r[0][7]=1.5,'HoyoSalida'],
   [r=>r[1][8]='SI','Capitan'],[r=>r[0][8]='NO','Capitan'],[r=>r[0][5]='NO','Capitan'],
   [r=>r[0][1]={formula:'1+1',result:2},'Nombre'],[r=>r[0][4]='','Clave']
  ];
  for(const [change,column] of cases){const r=structuredClone(rows);change(r);const p=await I.readFile(await file(r));assert.throws(()=>I.validate(state,p.rows),e=>e.status===422&&e.importErrors.some(x=>x.column===column));assert.deepEqual(state,original);}
+ const numericState=fixture();numericState.groups.at(-1).id='36';numericState.cards['36']=numericState.cards.NEW;delete numericState.cards.NEW;
+ const numericRows=structuredClone(rows);numericRows[0][0]=1234;numericRows[1][0]=999999999999999;numericRows[0][6]=36;numericRows[1][6]='36';
+ const numericParsed=await I.readFile(await file(numericRows)),numericRecords=I.validate(numericState,numericParsed.rows).records;
+ assert.equal(numericRecords[0].id,'1234');assert.equal(numericRecords[1].id,'999999999999999');assert(numericRecords.every(r=>r.groupId==='36'));
+ assert.equal(numericParsed.rows[0].values[0],1234); // Validation does not mutate source cells.
+ for(const [column,value] of [[0,-1],[0,1e15],[0,Number(state.players[0].id)],[6,36.5],[6,1e16],[6,-36],[6,{formula:'36',result:36}]]){const r=structuredClone(numericRows);r[0][column]=value;assert.throws(()=>I.validate(numericState,r.map((values,i)=>({row:i+2,values}))),e=>e.importErrors.some(x=>x.column===I.HEADERS[column]));}
+ const duplicate=structuredClone(numericRows);duplicate[1][0]='1234';assert.throws(()=>I.validate(numericState,duplicate.map((values,i)=>({row:i+2,values}))),e=>e.importErrors.some(x=>/repetida/.test(x.message)));
  for(const change of [s=>s.groups.at(-1).rosterClosed=true,s=>s.groups.at(-1).active=false,s=>s.cards.NEW.scores[0]=4,s=>s.cards.NEW.finalized={}]){const s=fixture();change(s);assert.throws(()=>I.validate(s,parsed.rows),e=>e.status===422);}
  for(const change of [(w,s)=>s.name='Otra',(w,s)=>w.addWorksheet('Otra'),(w,s)=>s.getCell('A1').value='Documento',(w,s)=>s.mergeCells('B4:C4'),(w,s)=>s.getCell('J2').value='extra',(w,s)=>s.getCell('A1002').value='fuera'])await assert.rejects(I.readFile(await file(rows,change)),e=>e.status===422);
  await assert.rejects(I.readFile('no es un excel'),e=>e.status===422);
